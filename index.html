@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sales Training — AI Call Simulator</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f7f8;
+      --card: #ffffff;
+      --text: #1a1a1a;
+      --muted: #6b6b6b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --danger: #dc2626;
+      --border: #e5e5e5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #17181a;
+        --card: #232426;
+        --text: #f2f2f2;
+        --muted: #9a9a9a;
+        --accent: #3b82f6;
+        --accent-hover: #60a5fa;
+        --border: #35363a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 48px 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+    select, input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin-bottom: 14px;
+      font-size: 0.95rem;
+    }
+    .field-label {
+      display: block;
+      text-align: left;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    #callScreen { display: none; }
+    .status {
+      font-size: 0.85rem;
+      color: var(--muted);
+      min-height: 20px;
+      margin-bottom: 16px;
+    }
+    .status.active { color: var(--accent); font-weight: 600; }
+    button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    #startBtn { background: var(--accent); color: white; }
+    #startBtn:hover { background: var(--accent-hover); }
+    #startBtn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+    #endBtn { background: var(--danger); color: white; display: none; }
+    #downloadBtn { background: var(--border); color: var(--text); margin-top: 10px; }
+    .mic-pulse {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: inline-block;
+      margin-right: 8px;
+      animation: pulse 1.2s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+    .hint { font-size: 0.78rem; color: var(--muted); margin-top: 18px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Sales call simulator</h1>
+    <p class="subtitle">Train against an AI prospect before your real calls.</p>
+
+    <div id="registerScreen">
+      <div class="row">
+        <div>
+          <label class="field-label" for="firstName">First name</label>
+          <input type="text" id="firstName" autocomplete="given-name" />
+        </div>
+        <div>
+          <label class="field-label" for="lastName">Last name</label>
+          <input type="text" id="lastName" autocomplete="family-name" />
+        </div>
+      </div>
+      <label class="field-label" for="email">Email</label>
+      <input type="email" id="email" autocomplete="email" />
+
+      <div class="status" id="registerStatus"></div>
+
+      <button id="registerBtn">Continue to training</button>
+
+      <p class="hint">
+        Your name/email are only included in the call transcript — nothing is shared elsewhere.
+      </p>
+    </div>
+
+    <div id="callScreen">
+      <select id="scenario">
+        <option value="3db3e980-42b4-4ccd-8c67-be725ee7e74c">1. The Curious Career-Changer</option>
+        <option value="d5941521-4953-49ba-955a-0e79300b2f81">2. The Overqualified Reskiller</option>
+        <option value="1cba132f-4e99-4021-bf54-e383c41119d0">3. The Committed Deliberator</option>
+        <option value="db999b02-82db-4a1c-878a-eb48a5f05dec">4. The Cash-Strapped Hot Lead</option>
+        <option value="cc39f31e-ebac-44d5-9ef4-66b68aac4eac">5. The Onboarding Enroller</option>
+        <option value="2dd08171-484d-4712-88dc-8457e5335d7e">6. The Skeptical Info-Gatherer</option>
+      </select>
+
+      <div class="status" id="status">Ready to start.</div>
+
+      <button id="startBtn">Start training</button>
+      <button id="endBtn">End call</button>
+      <button id="downloadBtn" style="display: none;">Download transcript</button>
+
+      <p class="hint">
+        Your browser's microphone will be used — no phone call is placed.
+        When the call ends, you can download the full transcript to review or share.
+      </p>
+    </div>
+  </div>
+
+  <!-- Vapi Web SDK loaded as an ES module (required — a classic <script src> does not expose a "Vapi" global) -->
+  <script type="module">
+    import Vapi from "https://esm.sh/@vapi-ai/web";
+    import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
+
+    const VAPI_PUBLIC_KEY = "ff302393-7b6d-47a6-a18e-02a50f4c27e4";
+
+    const vapi = new Vapi(VAPI_PUBLIC_KEY);
+
+    // --- Screen 1: identification (like the Runwaize form) ---
+    const registerScreen = document.getElementById("registerScreen");
+    const callScreen = document.getElementById("callScreen");
+    const registerBtn = document.getElementById("registerBtn");
+    const registerStatus = document.getElementById("registerStatus");
+    const firstNameInput = document.getElementById("firstName");
+    const lastNameInput = document.getElementById("lastName");
+    const emailInput = document.getElementById("email");
+
+    let trainee = { firstName: "", lastName: "", email: "" };
+
+    registerBtn.addEventListener("click", () => {
+      const firstName = firstNameInput.value.trim();
+      const lastName = lastNameInput.value.trim();
+      const email = emailInput.value.trim();
+
+      if (!firstName || !lastName || !/^\S+@\S+\.\S+$/.test(email)) {
+        registerStatus.textContent = "Please enter your first name, last name, and a valid email.";
+        return;
+      }
+
+      trainee = { firstName, lastName, email };
+      registerScreen.style.display = "none";
+      callScreen.style.display = "block";
+    });
+
+    // --- Screen 2: training call ---
+    const startBtn = document.getElementById("startBtn");
+    const endBtn = document.getElementById("endBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const statusEl = document.getElementById("status");
+    const scenarioSelect = document.getElementById("scenario");
+
+    let transcriptTurns = []; // [{ role, text }] — consecutive same-speaker lines merged into one paragraph
+
+    function setStatus(text, active = false) {
+      statusEl.textContent = text;
+      statusEl.classList.toggle("active", active);
+    }
+
+    function downloadTranscript() {
+      const scenarioLabel = scenarioSelect.options[scenarioSelect.selectedIndex].text;
+      const doc = new jsPDF();
+      const margin = 15;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const maxWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      function addText(text, { fontSize = 11, bold = false, gapAfter = 6 } = {}) {
+        doc.setFontSize(fontSize);
+        doc.setFont(undefined, bold ? "bold" : "normal");
+        const wrapped = doc.splitTextToSize(text, maxWidth);
+        wrapped.forEach((line) => {
+          if (y > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+          }
+          doc.text(line, margin, y);
+          y += fontSize * 0.5;
+        });
+        y += gapAfter;
+      }
+
+      addText("Sales call training transcript", { fontSize: 16, bold: true, gapAfter: 8 });
+      addText(`Date: ${new Date().toLocaleString()}`, { gapAfter: 2 });
+      addText(`Rep: ${trainee.firstName} ${trainee.lastName} (${trainee.email})`, { gapAfter: 2 });
+      addText(`Scenario: ${scenarioLabel}`, { gapAfter: 10 });
+
+      const repLabel = `${trainee.firstName} ${trainee.lastName}`.trim() || "Rep";
+      transcriptTurns.forEach((turn) => {
+        const label = turn.role === "assistant" ? "Prospect" : repLabel;
+        addText(`${label}:`, { bold: true, gapAfter: 1 });
+        addText(turn.text, { gapAfter: 5 });
+      });
+
+      doc.save(`transcript_${trainee.firstName}_${trainee.lastName}_${Date.now()}.pdf`);
+    }
+
+    downloadBtn.addEventListener("click", downloadTranscript);
+
+    startBtn.addEventListener("click", async () => {
+      const assistantId = scenarioSelect.value;
+      startBtn.disabled = true;
+      downloadBtn.style.display = "none";
+      transcriptTurns = [];
+      setStatus("Connecting…");
+      try {
+        // Metadata is attached to the call in Vapi's own dashboard/logs for reference.
+        await vapi.start(assistantId, {
+          metadata: {
+            firstName: trainee.firstName,
+            lastName: trainee.lastName,
+            email: trainee.email
+          }
+        });
+      } catch (err) {
+        console.error(err);
+        setStatus("Connection error — try again.");
+        startBtn.disabled = false;
+      }
+    });
+
+    endBtn.addEventListener("click", () => {
+      vapi.stop();
+    });
+
+    vapi.on("call-start", () => {
+      setStatus("On call — the prospect is picking up…", true);
+      startBtn.style.display = "none";
+      endBtn.style.display = "block";
+    });
+
+    vapi.on("speech-start", () => setStatus("🎙️ The prospect is speaking…", true));
+    vapi.on("speech-end", () => setStatus("Your turn to speak…", true));
+
+    // Accumulates the finalized transcript, merging consecutive same-speaker lines into one paragraph.
+    vapi.on("message", (msg) => {
+      if (msg.type === "transcript" && msg.transcriptType === "final") {
+        const last = transcriptTurns[transcriptTurns.length - 1];
+        if (last && last.role === msg.role) {
+          last.text += " " + msg.transcript;
+        } else {
+          transcriptTurns.push({ role: msg.role, text: msg.transcript });
+        }
+      }
+    });
+
+    vapi.on("call-end", () => {
+      setStatus("Call ended. You can download the transcript below.");
+      startBtn.style.display = "block";
+      startBtn.disabled = false;
+      endBtn.style.display = "none";
+      if (transcriptTurns.length > 0) {
+        downloadBtn.style.display = "block";
+      }
+    });
+
+    vapi.on("error", (e) => {
+      console.error(e);
+      setStatus("An error occurred.");
+    });
+  </script>
+</body>
+</html>
